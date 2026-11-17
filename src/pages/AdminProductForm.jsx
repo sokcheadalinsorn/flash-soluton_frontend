@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { useShop } from "../context/ShopContext";
-// new line was added below 1 line
 import { productApi } from "../services/api";
+
 const empty = {
   id: "",
   name: "",
@@ -16,29 +16,72 @@ const empty = {
   imageUrl: "",
   description: "",
 };
+
 export default function AdminProductForm() {
   const { id } = useParams();
   const editing = Boolean(id);
   const { products, saveProduct, updateProduct } = useShop();
   const navigate = useNavigate();
+
   const [form, setForm] = useState(empty);
   const [error, setError] = useState("");
-  // new 1 line was update below
-  // (this wiil help prevent users from submitting
-  //   the form multiple times while the POST request is running)
   const [saving, setSaving] = useState(false);
+
+  // ADDED: CATEGORY - Store categories from PostgreSQL
+  const [categories, setCategories] = useState([]);
+
+  // ADDED: CATEGORY - Fetch categories from Spring Boot
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const baseUrl = (
+          import.meta.env.VITE_API_URL || "http://localhost:8080"
+        ).replace(/\/$/, "");
+
+        const response = await fetch(`${baseUrl}/api/categories`);
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch categories");
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid categories response");
+        }
+
+        setCategories(data);
+
+        console.log("Categories from backend:", data);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        setError("Unable to load categories from backend.");
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // LOAD PRODUCT WHEN EDITING
   useEffect(() => {
     if (editing) {
       const found = products.find((p) => p.id === id);
+
       if (found) setForm({ ...found });
     }
   }, [id, editing, products]);
+
+  // HANDLE INPUT CHANGES
   const change = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm((f) => ({ ...f, [name]: type === "checkbox" ? checked : value }));
+
+    setForm((f) => ({
+      ...f,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
-  
-  // replace all above these code to :
+
+  // SUBMIT PRODUCT
   const submit = async (e) => {
     e.preventDefault();
     setError("");
@@ -53,6 +96,20 @@ export default function AdminProductForm() {
       // Step 2: Prevent multiple submissions
       setSaving(true);
 
+      // ADDED: CATEGORY - Find selected category in PostgreSQL
+      const selectedCategory = categories.find(
+        (category) =>
+          category.name.toLowerCase() ===
+          form.category.toLowerCase()
+      );
+
+      // ADDED: CATEGORY - Check selected category
+      if (!selectedCategory) {
+        throw new Error(
+          `Category "${form.category}" was not found in the database.`
+        );
+      }
+
       // Step 3: Prepare data for Spring Boot
       const productData = {
         name: form.name.trim(),
@@ -61,6 +118,11 @@ export default function AdminProductForm() {
         stock_quanity: Number(form.stock),
         imageUrl: form.imageUrl.trim(),
         sku: form.sku ?? "",
+
+        // ADDED: CATEGORY - Send category relationship
+        category: {
+          id: selectedCategory.id,
+        },
       };
 
       // EDIT PRODUCT - PUT REQUEST
@@ -71,8 +133,6 @@ export default function AdminProductForm() {
         // Send PUT request through ShopContext
         const updatedProduct = await updateProduct(id, productData);
 
-        console.log("Product updated successfully:", updatedProduct);
-
         alert("Product updated successfully!");
 
         navigate("/admin/products");
@@ -80,7 +140,6 @@ export default function AdminProductForm() {
       }
 
       // CREATE PRODUCT - POST REQUEST
-      // Keep your existing POST functionality
       const createdProduct = await productApi.create(productData);
 
       console.log("Product created successfully:", createdProduct);
@@ -92,13 +151,27 @@ export default function AdminProductForm() {
         id: String(createdProduct.id),
 
         stock: Number(
-          createdProduct.stock_quanity ?? createdProduct.stockQuantity ?? 0,
+          createdProduct.stock_quanity ??
+          createdProduct.stockQuantity ??
+          0
         ),
 
         brand: createdProduct.brand?.name ?? "",
-        category: createdProduct.category?.name ?? "",
 
-        imageUrl: createdProduct.imageUrl ?? createdProduct.image_url ?? "",
+        // ADDED: CATEGORY - Display selected category
+        category:
+          createdProduct.category?.name ??
+          form.category,
+
+        // ADDED: CATEGORY - Keep category ID
+        categoryId:
+          createdProduct.category?.id ??
+          selectedCategory.id,
+
+        imageUrl:
+          createdProduct.imageUrl ??
+          createdProduct.image_url ??
+          "",
 
         status: createdProduct.status ?? "Active",
         featured: createdProduct.featured ?? false,
@@ -110,14 +183,16 @@ export default function AdminProductForm() {
       alert("Product created successfully!");
 
       navigate("/admin/products");
+
     } catch (error) {
       console.error("Failed to save product:", error);
 
       setError(
         error.response?.data?.message ||
-          error.message ||
-          "Failed to save product. Please check your backend.",
+        error.message ||
+        "Failed to save product. Please check your backend."
       );
+
     } finally {
       // Step 4: Enable the save button again
       setSaving(false);
@@ -132,22 +207,27 @@ export default function AdminProductForm() {
       >
         <ArrowLeft size={15} /> Back to products
       </Link>
+
       <div className="mt-5">
         <p className="eyebrow text-rose">
           {editing ? "Catalogue update" : "New catalogue item"}
         </p>
+
         <h1 className="mt-2 font-display text-4xl">
           {editing ? "Edit product" : "Add product"}
         </h1>
+
         <p className="mt-2 text-sm text-muted">
           Enter the product information below.
         </p>
       </div>
+
       <form
         onSubmit={submit}
         className="mt-8 max-w-3xl rounded-2xl border border-line bg-white p-6 md:p-8"
       >
         <div className="grid gap-5 md:grid-cols-2">
+
           <label className="text-xs font-semibold">
             Product name *
             <input
@@ -159,6 +239,7 @@ export default function AdminProductForm() {
               placeholder="e.g. Daily Hydrating Serum"
             />
           </label>
+
           <label className="text-xs font-semibold">
             Brand
             <input
@@ -169,6 +250,8 @@ export default function AdminProductForm() {
               placeholder="Brand name"
             />
           </label>
+
+          {/* CATEGORY - ORIGINAL DESIGN */}
           <label className="text-xs font-semibold">
             Category
             <select
@@ -181,8 +264,10 @@ export default function AdminProductForm() {
               <option>Makeup</option>
               <option>Haircare</option>
               <option>Body</option>
+              <option>Fragrance</option>
             </select>
           </label>
+
           <label className="text-xs font-semibold">
             Price (USD) *
             <input
@@ -197,6 +282,7 @@ export default function AdminProductForm() {
               placeholder="0.00"
             />
           </label>
+
           <label className="text-xs font-semibold">
             Stock quantity *
             <input
@@ -210,6 +296,7 @@ export default function AdminProductForm() {
               placeholder="0"
             />
           </label>
+
           <label className="text-xs font-semibold">
             Status
             <select
@@ -222,6 +309,7 @@ export default function AdminProductForm() {
               <option>Draft</option>
             </select>
           </label>
+
           <label className="text-xs font-semibold md:col-span-2">
             Image URL
             <input
@@ -232,6 +320,7 @@ export default function AdminProductForm() {
               placeholder="https://example.com/product.jpg"
             />
           </label>
+
           <label className="text-xs font-semibold md:col-span-2">
             Description
             <textarea
@@ -242,6 +331,7 @@ export default function AdminProductForm() {
               placeholder="Describe the product..."
             />
           </label>
+
           <label className="flex items-center gap-2 text-sm md:col-span-2">
             <input
               type="checkbox"
@@ -252,13 +342,11 @@ export default function AdminProductForm() {
             Feature this product on the home page
           </label>
         </div>
+
         {error && <p className="mt-4 text-sm text-rose">{error}</p>}
+
         <div className="mt-7 flex flex-wrap gap-3 border-t border-line pt-6">
           {/* Change: Update the Save Button */}
-
-          {/* <button className="btn-primary">
-            <Save size={16} /> Save product
-          </button> */}
 
           {/* replace with these code below: */}
 
@@ -267,6 +355,7 @@ export default function AdminProductForm() {
 
             {saving ? "Saving..." : "Save product"}
           </button>
+
           {/* This prevents double submissions while saving. */}
 
           <Link to="/admin/products" className="btn-outline">
