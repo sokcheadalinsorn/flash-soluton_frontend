@@ -13,7 +13,7 @@ import ProductCard from "../components/ProductCard";
 const categories = [
   {
     name: "Skincare",
-    image: "/images/serum-ordinary.jpg",
+    image: "/images/serum.jpg",
     tone: "bg-[#ECEBDD]",
     description: "Daily rituals, thoughtfully chosen",
   },
@@ -25,7 +25,7 @@ const categories = [
   },
   {
     name: "Beauty Tools",
-    image: "/images/perfume-dior.jpg",
+    image: "/images/j'adore-dior-2.jpg",
     tone: "bg-[#F0EFE3]",
     description: "The finishing touches",
   },
@@ -205,7 +205,7 @@ export default function Home() {
             className="h-64 w-full rounded-2xl bg-cream object-cover"
           />
           <img
-            src="/images/bulsh-fenty.jpg"
+            src="/images/blush-fenty.jpg"
             alt="Makeup essentials"
             className="mt-9 h-64 w-full rounded-2xl bg-blush object-cover"
           />

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { useShop } from "../context/ShopContext";
 import { productApi } from "../services/api";
-
+import { categoryApi } from "../services/api";
 const empty = {
   id: "",
   name: "",
@@ -31,36 +31,26 @@ export default function AdminProductForm() {
   const [categories, setCategories] = useState([]);
 
   // ADDED: CATEGORY - Fetch categories from Spring Boot
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const baseUrl = (
-          import.meta.env.VITE_API_URL || "http://localhost:8080"
-        ).replace(/\/$/, "");
+useEffect(() => {
+  const fetchCategories = async () => {
+    try {
+      const data = await categoryApi.getAll();
 
-        const response = await fetch(`${baseUrl}/api/categories`);
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch categories");
-        }
-
-        const data = await response.json();
-
-        if (!Array.isArray(data)) {
-          throw new Error("Invalid categories response");
-        }
-
-        setCategories(data);
-
-        console.log("Categories from backend:", data);
-      } catch (error) {
-        console.error("Error fetching categories:", error);
-        setError("Unable to load categories from backend.");
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid categories response");
       }
-    };
 
-    fetchCategories();
-  }, []);
+      setCategories(data);
+
+      console.log("Categories loaded successfully:", data);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      setError("Unable to load categories from backend.");
+    }
+  };
+
+  fetchCategories();
+}, []);
 
   // LOAD PRODUCT WHEN EDITING
   useEffect(() => {
@@ -96,21 +86,18 @@ export default function AdminProductForm() {
       // Step 2: Prevent multiple submissions
       setSaving(true);
 
-      // ADDED: CATEGORY - Find selected category in PostgreSQL
+      // Step 1: Find selected category
       const selectedCategory = categories.find(
         (category) =>
-          category.name.toLowerCase() ===
-          form.category.toLowerCase()
+          category.name.toLowerCase() === form.category.toLowerCase(),
       );
 
-      // ADDED: CATEGORY - Check selected category
+      // Step 2: Check if category exists
       if (!selectedCategory) {
-        throw new Error(
-          `Category "${form.category}" was not found in the database.`
-        );
+        throw new Error("Category not found in database");
       }
 
-      // Step 3: Prepare data for Spring Boot
+      // Step 3: Prepare product data
       const productData = {
         name: form.name.trim(),
         description: form.description,
@@ -119,7 +106,7 @@ export default function AdminProductForm() {
         imageUrl: form.imageUrl.trim(),
         sku: form.sku ?? "",
 
-        // ADDED: CATEGORY - Send category relationship
+        // Category relationship
         category: {
           id: selectedCategory.id,
         },
@@ -151,27 +138,18 @@ export default function AdminProductForm() {
         id: String(createdProduct.id),
 
         stock: Number(
-          createdProduct.stock_quanity ??
-          createdProduct.stockQuantity ??
-          0
+          createdProduct.stock_quanity ?? createdProduct.stockQuantity ?? 0,
         ),
 
         brand: createdProduct.brand?.name ?? "",
 
         // ADDED: CATEGORY - Display selected category
-        category:
-          createdProduct.category?.name ??
-          form.category,
+        category: createdProduct.category?.name ?? form.category,
 
         // ADDED: CATEGORY - Keep category ID
-        categoryId:
-          createdProduct.category?.id ??
-          selectedCategory.id,
+        categoryId: createdProduct.category?.id ?? selectedCategory.id,
 
-        imageUrl:
-          createdProduct.imageUrl ??
-          createdProduct.image_url ??
-          "",
+        imageUrl: createdProduct.imageUrl ?? createdProduct.image_url ?? "",
 
         status: createdProduct.status ?? "Active",
         featured: createdProduct.featured ?? false,
@@ -183,16 +161,14 @@ export default function AdminProductForm() {
       alert("Product created successfully!");
 
       navigate("/admin/products");
-
     } catch (error) {
       console.error("Failed to save product:", error);
 
       setError(
         error.response?.data?.message ||
-        error.message ||
-        "Failed to save product. Please check your backend."
+          error.message ||
+          "Failed to save product. Please check your backend.",
       );
-
     } finally {
       // Step 4: Enable the save button again
       setSaving(false);
@@ -227,7 +203,6 @@ export default function AdminProductForm() {
         className="mt-8 max-w-3xl rounded-2xl border border-line bg-white p-6 md:p-8"
       >
         <div className="grid gap-5 md:grid-cols-2">
-
           <label className="text-xs font-semibold">
             Product name *
             <input
@@ -251,22 +226,27 @@ export default function AdminProductForm() {
             />
           </label>
 
-          {/* CATEGORY - ORIGINAL DESIGN */}
+          {/* CATEGORY - FETCHED FROM POSTGRESQL */}
           <label className="text-xs font-semibold">
-            Category
-            <select
-              className="field mt-2"
-              name="category"
-              value={form.category}
-              onChange={change}
-            >
-              <option>Skincare</option>
-              <option>Makeup</option>
-              <option>Haircare</option>
-              <option>Body</option>
-              <option>Fragrance</option>
-            </select>
-          </label>
+  Category
+  <select
+    className="field mt-2"
+    name="category"
+    value={form.category}
+    onChange={change}
+    disabled={categories.length === 0}
+  >
+    {categories.length === 0 && (
+      <option value="">No categories available</option>
+    )}
+
+    {categories.map((category) => (
+      <option key={category.id} value={category.name}>
+        {category.name}
+      </option>
+    ))}
+  </select>
+</label>
 
           <label className="text-xs font-semibold">
             Price (USD) *

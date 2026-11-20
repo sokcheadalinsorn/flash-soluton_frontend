@@ -16,33 +16,33 @@ const formatProduct = (product) => ({
   // FIX: Stock quantity
   stock: Number(
     product.stock_quanity ??
-    product.stockQuantity ??
-    product.stock_quantity ??
-    product.stock ??
-    0
+      product.stockQuantity ??
+      product.stock_quantity ??
+      product.stock ??
+      0,
   ),
 
   // FIX: Brand name
   brand:
     typeof product.brand === "object" && product.brand !== null
-      ? product.brand.name ?? ""
-      : product.brand ?? "",
+      ? (product.brand.name ?? "")
+      : (product.brand ?? ""),
 
   brandId:
     typeof product.brand === "object" && product.brand !== null
-      ? product.brand.id ?? null
-      : product.brandId ?? null,
+      ? (product.brand.id ?? null)
+      : (product.brandId ?? null),
 
   // Category name
   category:
     typeof product.category === "object" && product.category !== null
-      ? product.category.name ?? ""
-      : product.category ?? "",
+      ? (product.category.name ?? "")
+      : (product.category ?? ""),
 
   categoryId:
     typeof product.category === "object" && product.category !== null
-      ? product.category.id ?? null
-      : product.categoryId ?? null,
+      ? (product.category.id ?? null)
+      : (product.categoryId ?? null),
 
   imageUrl: product.imageUrl ?? product.image_url ?? "",
 
@@ -102,14 +102,14 @@ export function ShopProvider({ children }) {
   const addToCart = (product) => {
     setCart((current) => {
       const found = current.find(
-        (item) => String(item.id) === String(product.id)
+        (item) => String(item.id) === String(product.id),
       );
 
       return found
         ? current.map((item) =>
             String(item.id) === String(product.id)
               ? { ...item, quantity: item.quantity + 1 }
-              : item
+              : item,
           )
         : [...current, { ...product, quantity: 1 }];
     });
@@ -121,17 +121,15 @@ export function ShopProvider({ children }) {
       quantity <= 0
         ? current.filter((item) => String(item.id) !== String(id))
         : current.map((item) =>
-            String(item.id) === String(id)
-              ? { ...item, quantity }
-              : item
-          )
+            String(item.id) === String(id) ? { ...item, quantity } : item,
+          ),
     );
   };
 
   // REMOVE FROM CART
   const removeFromCart = (id) => {
     setCart((current) =>
-      current.filter((item) => String(item.id) !== String(id))
+      current.filter((item) => String(item.id) !== String(id)),
     );
   };
 
@@ -139,7 +137,7 @@ export function ShopProvider({ children }) {
   const updateProduct = async (productId, editedProduct) => {
     try {
       const existingProduct = products.find(
-        (product) => String(product.id) === String(productId)
+        (product) => String(product.id) === String(productId),
       );
 
       if (!existingProduct) {
@@ -159,8 +157,8 @@ export function ShopProvider({ children }) {
 
         stock_quanity: Number(
           editedProduct.stock_quanity ??
-          editedProduct.stock ??
-          existingProduct.stock
+            editedProduct.stock ??
+            existingProduct.stock,
         ),
 
         imageUrl: updatedProduct.imageUrl ?? "",
@@ -168,8 +166,7 @@ export function ShopProvider({ children }) {
       };
 
       // Include brand relationship when an ID is available
-      const brandId =
-        editedProduct.brandId ?? existingProduct.brandId;
+      const brandId = editedProduct.brandId ?? existingProduct.brandId;
 
       if (brandId !== null && brandId !== undefined && brandId !== "") {
         productData.brand = {
@@ -179,7 +176,9 @@ export function ShopProvider({ children }) {
 
       // Include category relationship when an ID is available
       const categoryId =
-        editedProduct.categoryId ?? existingProduct.categoryId;
+        editedProduct.category?.id ??
+        editedProduct.categoryId ??
+        existingProduct.categoryId;
 
       if (
         categoryId !== null &&
@@ -193,21 +192,16 @@ export function ShopProvider({ children }) {
 
       console.log("Sending updated product:", productData);
 
-      const response = await fetch(
-        `${API_BASE}/api/products/${productId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(productData),
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/products/${productId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(productData),
+      });
 
       if (!response.ok) {
-        throw new Error(
-          `Failed to update product: ${response.status}`
-        );
+        throw new Error(`Failed to update product: ${response.status}`);
       }
 
       const responseText = await response.text();
@@ -225,10 +219,8 @@ export function ShopProvider({ children }) {
       // Update React state
       setProducts((current) =>
         current.map((product) =>
-          String(product.id) === String(productId)
-            ? formattedProduct
-            : product
-        )
+          String(product.id) === String(productId) ? formattedProduct : product,
+        ),
       );
 
       return formattedProduct;
@@ -241,7 +233,7 @@ export function ShopProvider({ children }) {
   // SAVE PRODUCT
   const saveProduct = async (product) => {
     const exists = products.some(
-      (item) => String(item.id) === String(product.id)
+      (item) => String(item.id) === String(product.id),
     );
 
     if (exists) {
@@ -259,27 +251,22 @@ export function ShopProvider({ children }) {
   // DELETE PRODUCT - DELETE REQUEST
   const deleteProduct = async (id) => {
     try {
-      const response = await fetch(
-        `${API_BASE}/api/products/${id}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/products/${id}`, {
+        method: "DELETE",
+      });
 
       if (!response.ok) {
-        throw new Error(
-          `Failed to delete product: ${response.status}`
-        );
+        throw new Error(`Failed to delete product: ${response.status}`);
       }
 
       console.log("Product deleted successfully:", id);
 
       setProducts((current) =>
-        current.filter((item) => String(item.id) !== String(id))
+        current.filter((item) => String(item.id) !== String(id)),
       );
 
       setCart((current) =>
-        current.filter((item) => String(item.id) !== String(id))
+        current.filter((item) => String(item.id) !== String(id)),
       );
 
       return true;
@@ -301,14 +288,10 @@ export function ShopProvider({ children }) {
       updateProduct,
       deleteProduct,
     }),
-    [products, cart]
+    [products, cart],
   );
 
-  return (
-    <ShopContext.Provider value={value}>
-      {children}
-    </ShopContext.Provider>
-  );
+  return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
 }
 
 export const useShop = () => useContext(ShopContext);
