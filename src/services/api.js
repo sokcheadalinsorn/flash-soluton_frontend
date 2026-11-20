@@ -3,7 +3,7 @@ import axios from 'axios'
 // Base URL of the Java Spring Boot REST API.
 // Change VITE_API_BASE_URL in the .env file when the backend is ready.
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api'
 
 // Create one Axios instance so all API requests share the same configuration.
 const apiClient = axios.create({
@@ -109,6 +109,89 @@ export const authApi = {
     }
   }
 }
+
+
+export const userApi = {
+  // GET /api/users
+  async getAll(search = '') {
+    try {
+      const response = await apiClient.get('/users', {
+        params: search ? { search } : {}
+      })
+      return response.data
+    } catch (error) {
+      console.error('Unable to load users:', error)
+      throw error
+    }
+  },
+
+  // GET /api/users/{id}
+  async getById(id) {
+    try {
+      const response = await apiClient.get(`/users/${id}`)
+      return response.data
+    } catch (error) {
+      console.error('Unable to load user:', error)
+      throw error
+    }
+  },
+
+  // POST /api/users
+  async create(userData) {
+    try {
+      const response = await apiClient.post('/users', userData)
+      return response.data
+    } catch (error) {
+      console.error('Unable to create user:', error)
+      throw error
+    }
+  },
+
+  // PUT /api/users/{id}
+  async update(id, userData) {
+    try {
+      const response = await apiClient.put(`/users/${id}`, userData)
+      return response.data
+    } catch (error) {
+      console.error('Unable to update user:', error)
+      throw error
+    }
+  },
+
+  // PATCH /api/users/{id}/role
+  async updateRole(id, role) {
+    try {
+      const response = await apiClient.patch(`/users/${id}/role`, { role })
+      return response.data
+    } catch (error) {
+      console.error('Unable to update user role:', error)
+      throw error
+    }
+  },
+
+  // PATCH /api/users/{id}/status
+  async updateStatus(id, status) {
+    try {
+      const response = await apiClient.patch(`/users/${id}/status`, { status })
+      return response.data
+    } catch (error) {
+      console.error('Unable to update user status:', error)
+      throw error
+    }
+  },
+
+  // DELETE /api/users/{id}
+  async remove(id) {
+    try {
+      const response = await apiClient.delete(`/users/${id}`)
+      return response.data
+    } catch (error) {
+      console.error('Unable to delete user:', error)
+      throw error
+    }
+  }
+}
+
 
 export const orderApi = {
   // POST /api/orders

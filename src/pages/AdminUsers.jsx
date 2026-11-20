@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   UserPlus,
   Search,
@@ -11,71 +11,67 @@ import {
 
 import { userApi } from '../services/api'
 
+// Convert roles to the same format used by the backend.
+const normalizeRole = (role) => {
+  return role?.toUpperCase() === 'ADMIN' ? 'ADMIN' : 'CUSTOMER'
+}
+
 export default function AdminUsers() {
   const [users, setUsers] = useState([])
-  const [filteredUsers, setFilteredUsers] = useState([])
   const [query, setQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
+
   const [form, setForm] = useState({
     name: '',
     email: '',
-    role: 'Admin'
+    role: 'ADMIN'
   })
+
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
 
-  // Load all users from the backend.
-  useEffect(() => {
-    const loadUsers = async () => {
-      try {
-        const data = await userApi.getAll()
-        setUsers(data)
-      } catch (error) {
-        setMessage('Unable to load users. Please check your backend.')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadUsers()
-  }, [])
-
-  // Search users through the backend.
-  useEffect(() => {
-    let active = true
-
-    const searchUsers = async () => {
-      try {
-        const data = await userApi.getAll(query)
-
-        if (active) {
-          setFilteredUsers(data)
-        }
-      } catch (error) {
-        if (active) {
-          setMessage('Unable to search users.')
-        }
-      }
-    }
-
-    searchUsers()
-
-    return () => {
-      active = false
-    }
-  }, [query])
-
-  // Refresh the users list after an operation.
-  const refreshUsers = async () => {
+  // Load real users from the PostgreSQL database through the backend.
+  const loadUsers = async () => {
     try {
       const data = await userApi.getAll()
       setUsers(data)
-
-      const filteredData = await userApi.getAll(query)
-      setFilteredUsers(filteredData)
     } catch (error) {
-      setMessage('Unable to refresh users.')
+      console.error('Unable to load users:', error)
+      setMessage('Unable to load users. Please check your backend.')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  // Load users when the page first opens.
+  useEffect(() => {
+    loadUsers()
+  }, [])
+
+  // Search the users already loaded from the backend.
+  const filteredUsers = useMemo(() => {
+    const searchText = query.toLowerCase().trim()
+
+    if (!searchText) {
+      return users
+    }
+
+    return users.filter(user => {
+      const name = (user.name || user.fullName || '').toLowerCase()
+      const email = (user.email || '').toLowerCase()
+      const role = (user.role || '').toLowerCase()
+
+      return (
+        name.includes(searchText) ||
+        email.includes(searchText) ||
+        role.includes(searchText)
+      )
+    })
+  }, [users, query])
+
+  // Refresh the users list after an operation.
+  const refreshUsers = async () => {
+    await loadUsers()
   }
 
   // Add a new user.
@@ -91,19 +87,23 @@ export default function AdminUsers() {
         status: 'Invited'
       })
 
-      setForm({ name: '', email: '', role: 'Admin' })
+      setForm({
+        name: '',
+        email: '',
+        role: 'ADMIN'
+      })
+
       setShowForm(false)
       setMessage('User created successfully.')
 
       await refreshUsers()
     } catch (error) {
-      if (error.response?.status === 500) {
-        setMessage(
-          error.response?.data?.message || 'Unable to create user. The email may already exist.'
-        )
-      } else {
-        setMessage('Unable to create user. Please try again.')
-      }
+      console.error('Unable to create user:', error)
+
+      setMessage(
+        error.response?.data?.message ||
+        'Unable to create user. The email may already exist.'
+      )
     }
   }
 
@@ -120,14 +120,9 @@ export default function AdminUsers() {
         )
       )
 
-      setFilteredUsers(current =>
-        current.map(user =>
-          user.id === id ? { ...user, role } : user
-        )
-      )
-
       setMessage('User role updated successfully.')
     } catch (error) {
+      console.error('Unable to update role:', error)
       setMessage('Unable to update user role.')
     }
   }
@@ -145,14 +140,9 @@ export default function AdminUsers() {
         )
       )
 
-      setFilteredUsers(current =>
-        current.map(user =>
-          user.id === id ? { ...user, status } : user
-        )
-      )
-
       setMessage('User status updated successfully.')
     } catch (error) {
+      console.error('Unable to update status:', error)
       setMessage('Unable to update user status.')
     }
   }
@@ -167,9 +157,14 @@ export default function AdminUsers() {
 
     try {
       await userApi.remove(id)
+
+      setUsers(current =>
+        current.filter(user => user.id !== id)
+      )
+
       setMessage('User deleted successfully.')
-      await refreshUsers()
     } catch (error) {
+      console.error('Unable to delete user:', error)
       setMessage('Unable to delete user.')
     }
   }
@@ -210,14 +205,14 @@ export default function AdminUsers() {
         <div className="rounded-2xl border border-line bg-white p-5">
           <p className="text-xs text-muted">Administrators</p>
           <p className="mt-2 font-display text-3xl text-wine">
-            {users.filter(user => user.role === 'Admin').length}
+            {users.filter(user => normalizeRole(user.role) === 'ADMIN').length}
           </p>
         </div>
 
         <div className="rounded-2xl border border-line bg-white p-5">
           <p className="text-xs text-muted">Active accounts</p>
           <p className="mt-2 font-display text-3xl text-wine">
-            {users.filter(user => user.status === 'Active').length}
+            {users.filter(user => user.status?.toLowerCase() === 'active').length}
           </p>
         </div>
       </div>
@@ -284,8 +279,8 @@ export default function AdminUsers() {
                   setForm({ ...form, role: event.target.value })
                 }
               >
-                <option value="Admin">Admin</option>
-                <option value="Customer">Customer</option>
+                <option value="ADMIN">Admin</option>
+                <option value="CUSTOMER">Customer</option>
               </select>
             </label>
           </div>
@@ -358,7 +353,7 @@ export default function AdminUsers() {
 
                   <div>
                     <p className="text-sm font-semibold text-ink">
-                      {user.name}
+                      {user.name || user.fullName}
                     </p>
                     <p className="text-[11px] text-muted">
                       Account #{user.id}
@@ -373,31 +368,31 @@ export default function AdminUsers() {
                 <label className="text-[10px] text-muted md:text-xs">
                   Role
                   <select
-                    aria-label={`Role for ${user.name}`}
+                    aria-label={`Role for ${user.name || user.fullName}`}
                     className="field mt-1 py-2 text-xs"
-                    value={user.role}
+                    value={normalizeRole(user.role)}
                     onChange={event =>
                       updateRole(user.id, event.target.value)
                     }
                   >
-                    <option>Customer</option>
-                    <option>Admin</option>
+                    <option value="CUSTOMER">Customer</option>
+                    <option value="ADMIN">Admin</option>
                   </select>
                 </label>
 
                 <label className="text-[10px] text-muted md:text-xs">
                   Status
                   <select
-                    aria-label={`Status for ${user.name}`}
+                    aria-label={`Status for ${user.name || user.fullName}`}
                     className="field mt-1 py-2 text-xs"
                     value={user.status}
                     onChange={event =>
                       updateStatus(user.id, event.target.value)
                     }
                   >
-                    <option>Active</option>
-                    <option>Invited</option>
-                    <option>Suspended</option>
+                    <option value="Active">Active</option>
+                    <option value="Invited">Invited</option>
+                    <option value="Suspended">Suspended</option>
                   </select>
                 </label>
 
@@ -446,8 +441,8 @@ export default function AdminUsers() {
       <p className="mt-4 rounded-xl border border-[#E8DED4] bg-[#F5F3E9] p-4 text-xs leading-6 text-muted">
         <strong className="text-wine">Important:</strong> New users created
         from this page receive an Invited status. This does not create login
-        credentials or send an invitation email. Backend authentication
-        and protected admin permissions still need to be implemented.
+        credentials or send an invitation email. Registered customers are
+        loaded from the backend database.
       </p>
     </div>
   )
